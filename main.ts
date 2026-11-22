@@ -1,36 +1,21 @@
-// Tiny stack VM for make.fun's tiny-stack-vm-01: a faithful interpreter of the tiny stack ISA
-// (generator/subject/ISA.md). Runs every /input/<id>/ program and writes its stdout + exit code.
+// Tiny stack VM for make.fun's tiny-stack-vm-01: faithful interpreter of the tiny stack ISA.
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-// Opcode table, built once: T[op] = 1 + imm*16 + pops*4 + pushes (0 = not an opcode).
 const T = new Uint8Array(256);
-for (let o = 0; o < 256; o++) {
-  if (!(o <= 7 || (o >= 16 && o <= 34) || (o >= 48 && o <= 52) || o === 64 || o === 65 || (o >= 80 && o <= 83))) continue;
-  const imm = o === 1 ? 1 : o === 2 ? 4 : o >= 48 && o <= 51 ? 2 : 0;
-  const pops = o === 7 ? 3 : o === 5 || o === 6 || o === 65 || (o >= 16 && o <= 34 && o !== 23 && o !== 27) ? 2 : o === 3 || o === 4 || o === 23 || o === 27 || o === 49 || o === 50 || o === 64 || o === 80 || o === 81 || o === 83 ? 1 : 0;
-  const pushes = o === 6 || o === 7 ? 3 : o === 4 || o === 5 ? 2 : o === 1 || o === 2 || (o >= 16 && o <= 34) || o === 64 || o === 82 ? 1 : 0;
-  T[o] = 1 + imm * 16 + pops * 4 + pushes;
-}
-
-function run(p: Uint8Array, inp: Uint8Array): { o: Uint8Array; c: number } {
-  const D = new Int32Array(256);
-  const C = new Int32Array(64);
-  const M = new Int32Array(256);
-  const out = new Uint8Array(65536);
+for (let o = 16; o <= 30; o++) T[o] = o === 23 || o === 27 ? 6 : 10;
+for (const [o, v] of [[0, 1], [1, 18], [2, 66], [3, 5], [4, 7], [5, 11], [6, 12], [7, 16], [32, 10], [33, 10], [34, 10], [48, 33], [49, 37], [50, 37], [51, 33], [52, 1], [64, 6], [65, 9], [80, 5], [81, 5], [82, 2], [83, 5]]) T[o] = v;
+function run(p, inp) {
+  const D = new Int32Array(256), C = new Int32Array(64), M = new Int32Array(256), out = new Uint8Array(65536);
   let sp = 0, cp = 0, ol = 0, ip = 0, pc = 0, st = 0;
-  const trap = (c: number): { o: Uint8Array; c: number } => ({ o: out.slice(0, ol), c });
+  const trap = c => ({ o: out.slice(0, ol), c });
   for (;;) {
     if (st === 1000000) return trap(10);
     if (pc < 0 || pc >= p.length) return trap(9);
-    const op = p[pc];
-    const t = T[op];
+    const op = p[pc], t = T[op];
     if (!t) return trap(5);
     const imm = (t - 1) >> 4;
     if (pc + imm >= p.length) return trap(9);
     st++;
-    const nx = pc + 1 + imm;
-    const pops = ((t - 1) >> 2) & 3, pushes = (t - 1) & 3;
+    const nx = pc + 1 + imm, pops = ((t - 1) >> 2) & 3, pushes = (t - 1) & 3;
     if (sp < pops) return trap(2);
     if (sp - pops + pushes > 256) return trap(3);
     pc = nx;
@@ -47,7 +32,7 @@ function run(p: Uint8Array, inp: Uint8Array): { o: Uint8Array; c: number } {
       case 27: D[sp - 1] = ~D[sp - 1]; break;
       case 16: case 17: case 18: case 19: case 20: case 21: case 22: case 24: case 25: case 26: case 28: case 29: case 30: case 32: case 33: case 34: {
         const b = D[sp - 1], a = D[sp - 2];
-        let r: number;
+        let r;
         if (op === 16) r = (a + b) | 0;
         else if (op === 17) r = (a - b) | 0;
         else if (op === 18) r = Math.imul(a, b);
@@ -113,12 +98,11 @@ function run(p: Uint8Array, inp: Uint8Array): { o: Uint8Array; c: number } {
     }
   }
 }
-
-const I = process.env.MAKEFUN_INPUT_DIR ?? '/input';
-const O = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const I = process.env.MAKEFUN_INPUT_DIR || '/input';
+const O = process.env.MAKEFUN_OUTPUT_DIR || '/output';
 for (const id of readdirSync(I).sort()) {
-  const r = run(new Uint8Array(readFileSync(join(I, id, 'program.bin'))), new Uint8Array(readFileSync(join(I, id, 'input.bin'))));
-  mkdirSync(join(O, id), { recursive: true });
-  writeFileSync(join(O, id, 'stdout.bin'), r.o);
-  writeFileSync(join(O, id, 'exit.txt'), `${r.c}\n`);
+  const r = run(new Uint8Array(readFileSync(I + '/' + id + '/program.bin')), new Uint8Array(readFileSync(I + '/' + id + '/input.bin')));
+  mkdirSync(O + '/' + id, { recursive: true });
+  writeFileSync(O + '/' + id + '/stdout.bin', r.o);
+  writeFileSync(O + '/' + id + '/exit.txt', `${r.c}\n`);
 }
