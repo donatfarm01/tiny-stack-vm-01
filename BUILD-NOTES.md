@@ -10,4 +10,3 @@ Opcode dispatch via a table built once at startup.
 - This entry: 1,000,000 (40/40, passed 1). Baseline plain-vm: 670,000.
   Margin +330,000. Two runs byte-identical; outputs match vm.mjs on all 40.
 - Runtime ~0.37 s per practice set; 1,000,000-step loop ~0.25 s.
-- Grader size: 6,424 bytes over 2 files (LICENSE = starter file, 0).
